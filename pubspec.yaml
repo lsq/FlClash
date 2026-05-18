@@ -64,7 +64,7 @@ dependencies:
   material_color_utilities: ^0.13.0
   flutter_js:
     git:
-      url: https://github.com/chen08209/flutter_js
+      url: https://github.com/abner/flutter_js
       ref: master
   flutter_svg: ^2.1.0
   flutter_cache_manager: ^3.4.1
@@ -108,6 +108,7 @@ flutter:
     - assets/images/avatar/
     - assets/images/empty/
     - assets/images/icon/
+    - assets/js/
   fonts:
     - family: JetBrainsMono
       fonts:
