@@ -82,6 +82,7 @@ jobs:
         env:
           CGO_ENABLED: 0
         run: |
+          go mod tidy
           go test .
           go vet .
 
@@ -97,7 +98,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check format
         run: cargo fmt --manifest-path services/helper/Cargo.toml -- --check
@@ -191,6 +192,11 @@ jobs:
           go-version: '1.26.4'
           cache-dependency-path: |
             core/go.sum
+
+      - run: go mod tidy
+        working-directory: core
+        env:
+          CGO_ENABLED: 0
 
       - name: Enable git long paths (Windows)
         if: startsWith(matrix.os, 'windows')
