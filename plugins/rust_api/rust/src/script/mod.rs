@@ -1,4 +1,5 @@
 mod console;
+mod fetch;
 
 use rquickjs::{CatchResultExt, Context, Function, Runtime, Value};
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ fn evaluate_within(script: &str, config: &str, timeout: Duration) -> Result<Stri
     let context = Context::full(&runtime).map_err(|e| format!("{e}"))?;
     context.with(|ctx| {
         console::install(&ctx).catch(&ctx).map_err(describe)?;
+        fetch::install(&ctx).catch(&ctx).map_err(describe)?;
         ctx.eval::<Value, _>(script.as_bytes())
             .catch(&ctx)
             .map_err(describe)?;
