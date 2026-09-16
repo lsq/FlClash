@@ -470,7 +470,11 @@ class SetupAction extends _$SetupAction {
     final proxyGroups = isCustom ? setupState.proxyGroups : <ProxyGroup>[];
     final rules = isCustom ? setupState.rules : <Rule>[];
     if (hasScript) {
-      rawConfig = await handleEvaluate(scriptContent!, rawConfig);
+      rawConfig = await handleEvaluate(
+        scriptContent!,
+        rawConfig,
+        read: ref.read,
+      );
     }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(

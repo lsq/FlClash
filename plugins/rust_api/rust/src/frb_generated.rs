@@ -824,10 +824,12 @@ fn wire__crate__api__script__evaluate_script_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_script = <String>::sse_decode(&mut deserializer);
             let api_config = <String>::sse_decode(&mut deserializer);
+            let api_proxy = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
-                    let output_ok = crate::api::script::evaluate_script(api_script, api_config)?;
+                    let output_ok =
+                        crate::api::script::evaluate_script(api_script, api_config, api_proxy)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }

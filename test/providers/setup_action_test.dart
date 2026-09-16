@@ -1719,7 +1719,11 @@ void main() {
       addTearDown(() => scriptEvaluator = engine);
       final evaluated = <String>[];
       scriptEvaluator =
-          ({required String script, required String config}) async {
+          ({
+            required String script,
+            required String config,
+            String? proxy,
+          }) async {
             evaluated.add(script);
             return config;
           };
