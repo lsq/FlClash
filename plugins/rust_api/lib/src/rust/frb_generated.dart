@@ -131,6 +131,7 @@ abstract class RustLibApi extends BaseApi {
   Future<String> crateApiScriptEvaluateScript({
     required String script,
     required String config,
+    String? proxy,
   });
 
   Future<List<RustFoldRange>> crateApiEditorFoldsComputeAll({
@@ -537,6 +538,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<String> crateApiScriptEvaluateScript({
     required String script,
     required String config,
+    String? proxy,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -544,6 +546,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(script, serializer);
           sse_encode_String(config, serializer);
+          sse_encode_opt_String(proxy, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -556,7 +559,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiScriptEvaluateScriptConstMeta,
-        argValues: [script, config],
+        argValues: [script, config, proxy],
         apiImpl: this,
       ),
     );
@@ -565,7 +568,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiScriptEvaluateScriptConstMeta =>
       const TaskConstMeta(
         debugName: "evaluate_script",
-        argNames: ["script", "config"],
+        argNames: ["script", "config", "proxy"],
       );
 
   @override
@@ -1054,6 +1057,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_usize(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_usize(raw);
@@ -1302,6 +1311,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ans_.add(sse_decode_rust_fold_range(deserializer));
     }
     return ans_;
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
   }
 
   @protected
@@ -1576,6 +1596,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_rust_fold_range(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
     }
   }
 

@@ -8,16 +8,21 @@ const ENTRY: &str = "main";
 // A profile script is a pure transform that finishes in milliseconds. Anything
 // still running after this is a loop the user cannot otherwise escape, since
 // the evaluation blocks the profile from being applied.
-const TIMEOUT: Duration = Duration::from_secs(10);
+const TIMEOUT: Duration = Duration::from_secs(30);
 // QuickJS grows its heap on demand; the ceiling only has to be out of reach of
 // a config, which is megabytes at worst.
 const MEMORY_LIMIT: usize = 256 * 1024 * 1024;
 
-pub fn evaluate(script: &str, config: &str) -> Result<String, String> {
-    evaluate_within(script, config, TIMEOUT)
+pub fn evaluate(script: &str, config: &str, proxy: Option<&str>) -> Result<String, String> {
+    evaluate_within(script, config, proxy, TIMEOUT)
 }
 
-fn evaluate_within(script: &str, config: &str, timeout: Duration) -> Result<String, String> {
+fn evaluate_within(
+    script: &str,
+    config: &str,
+    proxy: Option<&str>,
+    timeout: Duration,
+) -> Result<String, String> {
     let runtime = Runtime::new().map_err(|e| format!("{e}"))?;
     runtime.set_memory_limit(MEMORY_LIMIT);
     let deadline = Instant::now() + timeout;
@@ -26,7 +31,11 @@ fn evaluate_within(script: &str, config: &str, timeout: Duration) -> Result<Stri
     let context = Context::full(&runtime).map_err(|e| format!("{e}"))?;
     context.with(|ctx| {
         console::install(&ctx).catch(&ctx).map_err(describe)?;
-        fetch::install(&ctx).catch(&ctx).map_err(describe)?;
+        fetch::install(&ctx, proxy).catch(&ctx).map_err(describe)?;
+        // load js-yaml.min.js
+        ctx.eval::<Value, _>(include_str!("vendor/js-yaml.min.js").as_bytes())
+            .catch(&ctx)
+            .map_err(describe)?;
         ctx.eval::<Value, _>(script.as_bytes())
             .catch(&ctx)
             .map_err(describe)?;
@@ -85,7 +94,7 @@ mod tests {
     use serde_json::{json, Value as Json};
 
     fn run(script: &str, config: Json) -> Result<Json, String> {
-        evaluate(script, &config.to_string()).map(|out| serde_json::from_str(&out).unwrap())
+        evaluate(script, &config.to_string(), None).map(|out| serde_json::from_str(&out).unwrap())
     }
 
     #[test]
@@ -182,6 +191,7 @@ mod tests {
         let error = evaluate_within(
             "function main() { while (true) {} }",
             "{}",
+            None,
             Duration::from_millis(100),
         )
         .unwrap_err();
@@ -232,7 +242,7 @@ mod tests {
         let script = include_str!("../../tests/fixtures/profile_script.js");
         let config = include_str!("../../tests/fixtures/profile_config.json");
 
-        serde_json::from_str(&evaluate(script, config).unwrap()).unwrap()
+        serde_json::from_str(&evaluate(script, config, None).unwrap()).unwrap()
     }
 
     #[test]
