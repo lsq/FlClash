@@ -74,20 +74,25 @@ void main() {
 
   test('lists the groups the script hands the core', () async {
     final inputs = <Map<String, dynamic>>[];
-    scriptEvaluator = ({required String script, required String config}) async {
-      final input = json.decode(config) as Map<String, dynamic>;
-      inputs.add(input);
-      return json.encode({
-        ...input,
-        'proxy-groups': [
-          {
-            'name': 'After',
-            'type': 'url-test',
-            'proxies': ['node'],
-          },
-        ],
-      });
-    };
+    scriptEvaluator =
+        ({
+          required String script,
+          required String config,
+          String? proxy,
+        }) async {
+          final input = json.decode(config) as Map<String, dynamic>;
+          inputs.add(input);
+          return json.encode({
+            ...input,
+            'proxy-groups': [
+              {
+                'name': 'After',
+                'type': 'url-test',
+                'proxies': ['node'],
+              },
+            ],
+          });
+        };
     final profile = Profile.normal(label: 'sub').copyWith(scriptId: script.id);
 
     final config = await outboundsOf(profile);
@@ -101,8 +106,9 @@ void main() {
   });
 
   test('a script that fails is an error, not the groups before it', () async {
-    scriptEvaluator = ({required String script, required String config}) =>
-        Future.error(StateError('main is not a function'));
+    scriptEvaluator =
+        ({required String script, required String config, String? proxy}) =>
+            Future.error(StateError('main is not a function'));
     final profile = Profile.normal(label: 'sub').copyWith(scriptId: script.id);
 
     await expectLater(

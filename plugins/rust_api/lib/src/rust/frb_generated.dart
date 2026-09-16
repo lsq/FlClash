@@ -185,6 +185,7 @@ abstract class RustLibApi extends BaseApi {
   Future<String> crateApiScriptEvaluateScript({
     required String script,
     required String config,
+    String? proxy,
   });
 
   Future<List<RustFoldRange>> crateApiEditorFoldsComputeAll({
@@ -1191,6 +1192,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<String> crateApiScriptEvaluateScript({
     required String script,
     required String config,
+    String? proxy,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1198,6 +1200,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(script, serializer);
           sse_encode_String(config, serializer);
+          sse_encode_opt_String(proxy, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1210,7 +1213,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiScriptEvaluateScriptConstMeta,
-        argValues: [script, config],
+        argValues: [script, config, proxy],
         apiImpl: this,
       ),
     );
@@ -1219,7 +1222,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiScriptEvaluateScriptConstMeta =>
       const TaskConstMeta(
         debugName: "evaluate_script",
-        argNames: ["script", "config"],
+        argNames: ["script", "config", "proxy"],
       );
 
   @override

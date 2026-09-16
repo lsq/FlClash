@@ -2133,7 +2133,11 @@ void main() {
       addTearDown(() => scriptEvaluator = engine);
       final evaluated = <String>[];
       scriptEvaluator =
-          ({required String script, required String config}) async {
+          ({
+            required String script,
+            required String config,
+            String? proxy,
+          }) async {
             evaluated.add(script);
             return config;
           };
@@ -2175,10 +2179,13 @@ void main() {
       final engine = scriptEvaluator;
       addTearDown(() => scriptEvaluator = engine);
       scriptEvaluator =
-          ({required String script, required String config}) async =>
-              json.encode({
-                'rules': ['DOMAIN,script.com,DIRECT', 'MATCH,FromScript'],
-              });
+          ({
+            required String script,
+            required String config,
+            String? proxy,
+          }) async => json.encode({
+            'rules': ['DOMAIN,script.com,DIRECT', 'MATCH,FromScript'],
+          });
       final script = await Script(
         id: 78,
         label: 'script',
