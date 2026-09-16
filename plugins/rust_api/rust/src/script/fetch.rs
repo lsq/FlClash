@@ -1,12 +1,12 @@
 use rquickjs::function::Opt;
 use rquickjs::{Ctx, Function, Object, Result, Value};
-use std::sync::OnceLock;
+use std::sync::Arc;
 use std::time::Duration;
 
 // Scripts run inside a hard wall-clock budget (see mod.rs::TIMEOUT); fetch's
 // own timeout only needs to keep a hung socket from outliving the interrupt
 // handler by an unreasonable margin.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Certificate verifier that accepts anything. The scripting sandbox targets
 /// hosts the user already trusts (their own subscription/profile endpoints)
@@ -53,34 +53,53 @@ impl rustls::client::danger::ServerCertVerifier for NoVerify {
     }
 }
 
-fn agent() -> &'static ureq::Agent {
-    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
-    AGENT.get_or_init(|| {
-        let _ = rustls::crypto::ring::default_provider().install_default();
+fn build_agent(proxy: Option<&str>) -> Result<ureq::Agent> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
-        let tls_config = rustls::ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(std::sync::Arc::new(NoVerify))
-            .with_no_client_auth();
+    let tls_config = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoVerify))
+        .with_no_client_auth();
 
-        ureq::AgentBuilder::new()
-            .timeout(REQUEST_TIMEOUT)
-            .tls_config(std::sync::Arc::new(tls_config))
-            .build()
-    })
+    let mut builder = ureq::AgentBuilder::new()
+        .timeout(REQUEST_TIMEOUT)
+        .tls_config(Arc::new(tls_config));
+
+    // Route through mihomo's own mixed port when the core/TUN is active.
+    // That listener's dialer already protects its own sockets from the
+    // device's TUN routes; a raw socket opened here would not be, and gets
+    // aborted (ECONNABORTED) as soon as it is captured by the tunnel.
+    if let Some(proxy) = proxy {
+        let proxy = ureq::Proxy::new(proxy)
+            .map_err(|e| rquickjs::Error::new_from_js_message("string", "Proxy", e.to_string()))?;
+        builder = builder.proxy(proxy);
+    }
+
+    Ok(builder.build())
 }
 
 /// Exposes a synchronous, blocking `fetch(url, options?)` to profile scripts.
 /// Unlike the browser API this returns a plain result object rather than a
 /// Promise, since the caller already blocks on the whole script.
-pub fn install(ctx: &Ctx<'_>) -> Result<()> {
-    let fetch = Function::new(ctx.clone(), get)?;
+/// `proxy`, if set, is `http://127.0.0.1:<mixed-port>` — mihomo's own local
+/// listener — and every request from this engine is routed through it so it
+/// inherits the VPN-protect handling mihomo's dialer already does.
+pub fn install(ctx: &Ctx<'_>, proxy: Option<&str>) -> Result<()> {
+    let agent = build_agent(proxy)?;
+    let fetch = Function::new(ctx.clone(), move |ctx, url, options| {
+        get(ctx, &agent, url, options)
+    })?;
     ctx.globals().set("fetch", fetch)
 }
 
-fn get<'js>(ctx: Ctx<'js>, url: String, options: Opt<Object<'js>>) -> Result<Object<'js>> {
-    let options = options.0; // Option<Object<'js>>
-    let mut request = agent().get(&url);
+fn get<'js>(
+    ctx: Ctx<'js>,
+    agent: &ureq::Agent,
+    url: String,
+    options: Opt<Object<'js>>,
+) -> Result<Object<'js>> {
+    let options = options.0;
+    let mut request = agent.get(&url);
 
     if let Some(options) = &options {
         if let Ok(referer) = options.get::<_, String>("referer") {
@@ -94,7 +113,9 @@ fn get<'js>(ctx: Ctx<'js>, url: String, options: Opt<Object<'js>>) -> Result<Obj
         }
     }
 
-    let response = request.call().map_err(|error| describe(&ctx, error))?;
+    let response = request
+        .call()
+        .map_err(|error| rquickjs::Exception::throw_message(&ctx, &error.to_string()))?;
     let status = response.status();
     let text = response
         .into_string()
@@ -157,7 +178,9 @@ mod tests {
         let runtime = Runtime::new().unwrap();
         let context = Context::full(&runtime).unwrap();
         context.with(|ctx| {
-            install(&ctx).catch(&ctx).map_err(super::super::describe)?;
+            install(&ctx, None)
+                .catch(&ctx)
+                .map_err(super::super::describe)?;
             let value: Value = ctx
                 .eval(script.as_bytes())
                 .catch(&ctx)
