@@ -4,14 +4,22 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 /// Runs `main(config)` from a profile override script and returns the JSON the
 /// script produced. `config` is the profile as JSON; the result replaces it.
+///
+/// `proxy` is `Some("http://127.0.0.1:<mixed-port>")` whenever the core's TUN
+/// is active, so `fetch()` calls inside the script go through mihomo's own
+/// (already VPN-protected) listener instead of opening a raw socket that the
+/// device's own TUN routes would otherwise capture and abort.
 Future<String> evaluateScript({
   required String script,
   required String config,
+  String? proxy,
 }) => RustLib.instance.api.crateApiScriptEvaluateScript(
   script: script,
   config: config,
+  proxy: proxy,
 );

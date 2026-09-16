@@ -1,6 +1,13 @@
 name: build
 
 on:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: "Run ssh"
+        required: false
+        default: false
   push:
     branches:
       - 'android-fetch'
@@ -43,6 +50,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3.24
+      #   with:
+      #     detached: true
+      #   if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+      #   timeout-minutes: 15
+      - name: Setup upterm session
+        with:
+          detached: true
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+        uses: owenthereal/action-upterm@v1
+        timeout-minutes: 10
+
       - name: Check format
         run: dart format --output=none --set-exit-if-changed lib test tool plugins setup.dart
 
@@ -59,6 +79,11 @@ jobs:
 
       - name: Run tests
         run: flutter test --reporter expanded --coverage
+
+      - name: Setup tmate session for debugging
+        if: failure()
+        uses: mxschmitt/action-tmate@v3.24
+        timeout-minutes: 15
 
       - name: Check coverage
         run: dart run tool/check_coverage.dart coverage/lcov.info 75
@@ -97,7 +122,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: core/go.sum
@@ -162,7 +187,7 @@ jobs:
           ndk-version: ${{ env.NDK_VERSION }}
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -217,7 +242,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -231,7 +256,8 @@ jobs:
         run: cargo test --manifest-path services/helper/Cargo.toml --features windows-service
 
   build:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push'
+    # && startsWith(github.ref, 'refs/tags/v')
     needs: [ dart, plugins, go, android, rust, windows-helper-test ]
     runs-on: ${{ matrix.os }}
     strategy:
@@ -275,11 +301,17 @@ jobs:
 
       - name: Setup Version
         run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
           curDir=$(pwd)
           cd core/Clash.Meta
           git fetch --unshallow 2>/dev/null || git fetch origin
+          git remote add upstream https://github.com/MetaCubeX/mihomo.git
+          git fetch upstream
+          git rebase upstream/Meta
           prev_commit=$(git rev-parse HEAD~1)
           echo "Previous commit (HEAD~1): $prev_commit"
+          git apply ../../tool/go_debug.patch
 
           cd $curDir
           git clone -b Meta https://github.com/MetaCubeX/mihomo.git
@@ -310,7 +342,7 @@ jobs:
           } >> android/local.properties
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: core/go.sum
@@ -367,7 +399,20 @@ jobs:
       - name: Setup
         env:
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
-        run: dart setup.dart ${{ matrix.platform }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} -v
+        run: dart setup.dart ${{ matrix.platform }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} --arch arm64 -v
+
+      # - name: Setup tmate session for debugging
+      #   if: failure()
+      #   uses: mxschmitt/action-tmate@v3.24
+      #   timeout-minutes: 15
+      - name: Setup upterm session
+        if: failure()
+        with:
+          detached: true
+        uses: owenthereal/action-upterm@v1
+        timeout-minutes: 10
+
+
 
       - name: Upload
         uses: actions/upload-artifact@v6

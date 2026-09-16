@@ -349,7 +349,11 @@ class SetupAction extends _$SetupAction {
     );
     Map<String, dynamic> rawConfig = configMap;
     if (scriptContent?.isNotEmpty == true) {
-      rawConfig = await handleEvaluate(scriptContent!, rawConfig);
+      rawConfig = await handleEvaluate(
+        scriptContent!,
+        rawConfig,
+        read: ref.read,
+      );
     }
     final directory = await appPath.profilesPath;
     final res = makeRealProfileTask(
