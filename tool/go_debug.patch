@@ -1,0 +1,14 @@
+diff --git a/adapter/outbound/reality.go b/adapter/outbound/reality.go
+index 70c7bc7a..a890d6c6 100644
+--- a/adapter/outbound/reality.go
++++ b/adapter/outbound/reality.go
+@@ -38,7 +38,8 @@ func (o RealityOptions) Parse() (*tlsC.RealityConfig, error) {
+ 		}
+ 		n, err = hex.Decode(config.ShortID[:], []byte(o.ShortID))
+ 		if err != nil || n > tlsC.RealityMaxShortIDLen {
+-			return nil, errors.New("invalid REALITY short ID")
++			return nil, fmt.Errorf("invalid REALITY short ID (hex error: %v, raw value: %q, len: %d, bytes: %v)", err, o.ShortID, len(o.ShortID), []byte(o.ShortID))
++			// errors.New("invalid REALITY short ID")
+ 		}
+ 
+ 		return config, nil

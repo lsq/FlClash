@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:fl_clash/common/yaml_quote.dart';
 
 import 'clash_config.dart';
 
@@ -205,7 +206,8 @@ extension ProfileExtension on Profile {
   }) async {
     final path = await appPath.tempFilePath;
     final tempFile = File(path);
-    await tempFile.safeWriteAsBytes(bytes);
+    final patchedBytes = quoteKnownStringFieldsInBytes(bytes); // <-- inserted
+    await tempFile.safeWriteAsBytes(patchedBytes);
     if (await validate(path, ageSecretKey) case final issue?) {
       throw MessageException(issue);
     }
